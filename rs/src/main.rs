@@ -1,8 +1,10 @@
 mod binary;
+mod vm;
 use std::env;
 use std::fs;
 
 use binary::chunk::Constant;
+use vm::instruction::Instruction;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -61,7 +63,53 @@ fn print_code(proto: &binary::chunk::Prototype) {
         } else {
             "-".to_string()
         };
-        println!("\t{}\t[{}]\t{:#010x}", i + 1, line, c.clone());
+
+        let instruction = c.clone();
+        print!("\t{}\t[{}]\t{} \t", i + 1, line, instruction.op_name());
+        print_operands(instruction);
+        println!();
+    }
+}
+
+fn print_operands(instruction: u32) {
+    match instruction.op_mode() {
+        vm::opcode::OP_MODE_ABC => {
+            let (a, b, c) = instruction.abc();
+            print!("{}", a);
+            if instruction.b_arg_mode() != vm::opcode::OP_ARG_N {
+                if b > 0xFF {
+                    print!(" {}", -1 - (b & 0xFF));
+                } else {
+                    print!(" {}", b);
+                }
+            }
+
+            if instruction.c_arg_mode() != vm::opcode::OP_ARG_N {
+                if c > 0xFF {
+                    print!(" {}", -1 - (c & 0xFF));
+                } else {
+                    print!(" {}", c);
+                }
+            }
+        }
+        vm::opcode::OP_MODE_ABX => {
+            let (a, bx) = instruction.abx();
+            print!("{}", a);
+            if instruction.b_arg_mode() == vm::opcode::OP_ARG_K {
+                print!(" {}", -1 - bx);
+            } else if instruction.b_arg_mode() == vm::opcode::OP_ARG_U {
+                print!(" {}", bx)
+            }
+        }
+        vm::opcode::OP_MODE_ASBX => {
+            let (a, sbx) = instruction.asbx();
+            print!("{} {}", a, sbx);
+        }
+        vm::opcode::OP_MODE_AX => {
+            let ax = instruction.ax();
+            print!("{}", -1 - ax)
+        }
+        _ => ()
     }
 }
 
@@ -100,7 +148,7 @@ fn constant_to_string(constant: &Constant) -> String {
         Constant::Boolean(b) => b.to_string(),
         Constant::Number(n) => n.to_string(),
         Constant::Integer(i) => i.to_string(),
-        Constant::Str(s) => format!("\"{}\"", s.to_owned()),
+        Constant::Str(s) => format!("\"{}\"", s),
     }
 }
 
